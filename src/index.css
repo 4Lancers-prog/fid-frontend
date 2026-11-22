@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global base */
+html, body, #root { height: 100%; }
+body { @apply bg-slate-50 text-slate-800 antialiased; }
+
+/*
+ * Print styles for the FID card. CSS @page and @media print rules cannot be
+ * expressed through Tailwind utility classes, so this small, scoped block is a
+ * deliberate, documented exception to the "Tailwind only" rule.
+ * Output target: 4x6 inch photo paper, card at 85.6mm x 54mm.
+ */
+@media print {
+  body * { visibility: hidden !important; }
+  #fid-print-container, #fid-print-container * { visibility: visible !important; }
+  #fid-print-container {
+    position: absolute; left: 0; top: 0;
+    width: 6in !important; height: 4in !important;
+    margin: 0 !important; padding: 0 !important;
+    display: flex !important; align-items: center; justify-content: center;
+    background: #ffffff !important;
+  }
+  @page { size: 6in 4in landscape; margin: 0; }
+  .fid-card-print {
+    width: 85.6mm !important; height: 54mm !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .fid-card-print * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
