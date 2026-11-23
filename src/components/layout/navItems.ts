@@ -17,7 +17,7 @@ export const navItems: NavItem[] = [
   { label: 'Dashboard', labelKey: 'nav.dashboard', to: '/dashboard', icon: LayoutDashboard, ready: true },
   { label: 'FID Card Maker', labelKey: 'nav.fid', to: '/fid', icon: IdCard, roles: ['admin', 'operator'], ready: true },
   { label: 'Farmers', labelKey: 'nav.farmers', to: '/farmers', icon: Users, roles: ['admin', 'operator', 'viewer', 'loan_executive'], ready: true },
-  { label: 'FRUITS / K-Kisan Lookup', labelKey: 'nav.lookup', to: '/lookup', icon: Search, roles: ['admin', 'operator'], ready: true },
+  { label: 'FRUITS / K-Kisan Lookup', labelKey: 'nav.lookup', to: '/lookup', icon: Search, roles: ['admin'], ready: true },
   { label: 'Crop Insurance', labelKey: 'nav.crop', to: '/crop-insurance', icon: Sprout, roles: ['admin', 'operator'], ready: true },
   { label: 'Vehicle Insurance', labelKey: 'nav.vehicle', to: '/vehicle-insurance', icon: Car, roles: ['admin', 'operator'], ready: true },
   { label: 'Trailer Certificate', labelKey: 'nav.trailer', to: '/trailer-certificate', icon: Truck, roles: ['admin', 'operator'], ready: true },

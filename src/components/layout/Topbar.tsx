@@ -11,6 +11,7 @@ const roleLabels: Record<string, string> = {
   operator: 'Operator',
   loan_executive: 'Loan Executive',
   viewer: 'Viewer',
+  customer: 'Customer',
 };
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {

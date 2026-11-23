@@ -40,7 +40,19 @@ export async function getFarmerHistory(id: string): Promise<FarmerHistoryEntry[]
   return res.data.data;
 }
 
-export async function lookupByAadhaar(aadhaar: string): Promise<{ exists: boolean; farmer: Farmer | null }> {
+export interface FetchedDetails {
+  name?: string;
+  gender?: 'male' | 'female' | 'other';
+  fid?: string;
+  mobile?: string;
+  address?: string;
+  village?: string;
+  taluk?: string;
+  district?: string;
+}
+export async function lookupByAadhaar(
+  aadhaar: string,
+): Promise<{ exists: boolean; source: 'database' | 'fruits' | null; farmer: Farmer | null; details: FetchedDetails | null }> {
   const res = await api.post('/farmers/lookup', { aadhaar });
   return res.data.data;
 }

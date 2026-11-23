@@ -25,6 +25,7 @@ const ROLES: { value: UserRole; label: string }[] = [
   { value: 'operator', label: 'Operator' },
   { value: 'loan_executive', label: 'Loan Executive' },
   { value: 'viewer', label: 'Viewer' },
+  { value: 'customer', label: 'Customer' },
 ];
 const roleLabel = (r: string) => ROLES.find((x) => x.value === r)?.label ?? r;
 
@@ -80,7 +81,7 @@ function RegistrationsTab() {
   const approve = async (u: User) => {
     setBusyId(u.id); setError(null);
     try {
-      await usersApi.approve(u.id, roles[u.id] ?? 'operator');
+      await usersApi.approve(u.id, roles[u.id] ?? 'customer');
       showToast(`Approved ${u.name}.`);
       load();
     } catch (e) { setError(normaliseError(e).message); } finally { setBusyId(null); }
@@ -139,7 +140,7 @@ function RegistrationsTab() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <Select value={roles[u.id] ?? 'operator'} onChange={(e) => setRoles((r) => ({ ...r, [u.id]: e.target.value as UserRole }))} className="max-w-[160px]">
+                      <Select value={roles[u.id] ?? 'customer'} onChange={(e) => setRoles((r) => ({ ...r, [u.id]: e.target.value as UserRole }))} className="max-w-[160px]">
                         {ROLES.filter((r) => r.value !== 'super_admin').map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </Select>
                     </td>

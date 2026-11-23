@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'admin' | 'operator' | 'loan_executive' | 'viewer';
+export type UserRole = 'super_admin' | 'admin' | 'operator' | 'loan_executive' | 'viewer' | 'customer';
 export type Gender = 'male' | 'female' | 'other';
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';

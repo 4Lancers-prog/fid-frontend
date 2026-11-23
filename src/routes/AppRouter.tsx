@@ -41,12 +41,12 @@ export function AppRouter() {
         <Route path="/fid" element={<ProtectedRoute roles={['admin', 'operator']}><FidCardMakerPage /></ProtectedRoute>} />
         <Route path="/farmers" element={<FarmersPage />} />
         <Route path="/wallet" element={<WalletPage />} />
-        <Route path="/lookup" element={<ProtectedRoute roles={['admin', 'operator']}><LookupPage /></ProtectedRoute>} />
+        <Route path="/lookup" element={<ProtectedRoute roles={['admin']}><LookupPage /></ProtectedRoute>} />
         <Route path="/crop-insurance" element={<ProtectedRoute roles={['admin', 'operator', 'viewer']}><CropPage /></ProtectedRoute>} />
         <Route path="/vehicle-insurance" element={<ProtectedRoute roles={['admin', 'operator', 'viewer']}><VehiclePage /></ProtectedRoute>} />
         <Route path="/trailer-certificate" element={<ProtectedRoute roles={['admin', 'operator', 'viewer']}><TrailerPage /></ProtectedRoute>} />
         <Route path="/loan-leads" element={<ProtectedRoute roles={['admin', 'loan_executive', 'viewer']}><LoanPage /></ProtectedRoute>} />
-        <Route path="/documents" element={<ProtectedRoute roles={['admin', 'operator', 'viewer', 'loan_executive']}><DocumentScannerPage /></ProtectedRoute>} />
+        <Route path="/documents" element={<ProtectedRoute roles={['admin', 'operator', 'viewer', 'loan_executive', 'customer']}><DocumentScannerPage /></ProtectedRoute>} />
         <Route path="/payments" element={<PaymentsPage />} />
         <Route path="/applications" element={<ProtectedRoute roles={['admin']}><ApplicationsPage /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute roles={['super_admin', 'admin']}><AdminPage /></ProtectedRoute>} />
