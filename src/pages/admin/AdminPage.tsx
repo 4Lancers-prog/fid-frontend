@@ -2,8 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useT } from '../../i18n';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Pencil, Wallet, ShieldCheck, ScrollText, ClipboardCheck, CheckCircle2, XCircle } from 'lucide-react';
-import { usersApi, auditApi, type AuditEntry } from '../../services/admin.service';
+import { Plus, Pencil, Wallet, ShieldCheck, ScrollText, ClipboardCheck, CheckCircle2, XCircle, ListChecks } from 'lucide-react';
+import { usersApi, auditApi, serviceSettingsApi, type AuditEntry } from '../../services/admin.service';
 import { createUserSchema } from '../../schemas';
 import type { User, UserRole, FieldError } from '../../types';
 import { normaliseError } from '../../lib/api';
@@ -31,7 +31,7 @@ const roleLabel = (r: string) => ROLES.find((x) => x.value === r)?.label ?? r;
 
 export function AdminPage() {
   const t = useT();
-  const [tab, setTab] = useState<'users' | 'registrations' | 'audit'>('registrations');
+  const [tab, setTab] = useState<'users' | 'registrations' | 'services' | 'audit'>('registrations');
   const tabCls = (active: boolean) =>
     `flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 font-medium ${active ? 'bg-brand-50 text-brand-700' : 'text-slate-500 hover:bg-slate-50'}`;
   return (
@@ -47,11 +47,14 @@ export function AdminPage() {
         <button onClick={() => setTab('users')} className={tabCls(tab === 'users')}>
           <ShieldCheck className="h-4 w-4" /> Users &amp; Roles
         </button>
+        <button onClick={() => setTab('services')} className={tabCls(tab === 'services')}>
+          <ListChecks className="h-4 w-4" /> Services
+        </button>
         <button onClick={() => setTab('audit')} className={tabCls(tab === 'audit')}>
           <ScrollText className="h-4 w-4" /> Audit Log
         </button>
       </div>
-      {tab === 'registrations' ? <RegistrationsTab /> : tab === 'users' ? <UsersTab /> : <AuditTab />}
+      {tab === 'registrations' ? <RegistrationsTab /> : tab === 'users' ? <UsersTab /> : tab === 'services' ? <ServicesTab /> : <AuditTab />}
     </div>
   );
 }
@@ -352,6 +355,61 @@ function WalletModal({ target, onClose, onDone }: { target: User | null; onClose
         <Button onClick={save} loading={saving}>Credit Wallet</Button>
       </div>
     </Modal>
+  );
+}
+
+
+function ServicesTab() {
+  const SERVICES: { key: string; label: string; desc: string }[] = [
+    { key: 'crop', label: 'Crop Insurance', desc: 'Let customers create crop insurance applications.' },
+    { key: 'vehicle', label: 'Vehicle Insurance', desc: 'Let customers create vehicle insurance applications.' },
+    { key: 'trailer', label: 'Usha Tailoring Certificate', desc: 'Let customers apply for Usha tailoring certificates.' },
+    { key: 'loan', label: 'Loan', desc: 'Let customers submit loan applications.' },
+  ];
+  const [enabled, setEnabled] = useState<Record<string, boolean> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    serviceSettingsApi.get().then((r) => setEnabled(r.enabledServices)).catch((e) => setError(normaliseError(e).message));
+  }, []);
+
+  const save = async () => {
+    if (!enabled) return;
+    setSaving(true); setError(null);
+    try {
+      await serviceSettingsApi.update(enabled);
+      setToast('Services updated.'); setTimeout(() => setToast(null), 4000);
+    } catch (e) { setError(normaliseError(e).message); } finally { setSaving(false); }
+  };
+
+  if (error) return <Alert tone="error">{error}</Alert>;
+  if (!enabled) return <FullPageLoader label="Loading services…" />;
+
+  return (
+    <Card className="max-w-2xl">
+      <h2 className="mb-1 text-sm font-bold text-slate-700">Applications available to customers</h2>
+      <p className="mb-4 text-xs text-slate-500">Turn a service on to let customers create and upload that application type. Operators and admins can always use every service.</p>
+      {toast && <div className="mb-4"><Alert tone="success">{toast}</Alert></div>}
+      <div className="space-y-2">
+        {SERVICES.map((svc) => (
+          <label key={svc.key} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+            <div>
+              <div className="text-sm font-medium text-slate-800">{svc.label}</div>
+              <div className="text-xs text-slate-500">{svc.desc}</div>
+            </div>
+            <input
+              type="checkbox"
+              checked={!!enabled[svc.key]}
+              onChange={(e) => setEnabled((p) => ({ ...(p ?? {}), [svc.key]: e.target.checked }))}
+              className="h-5 w-5 rounded border-slate-300"
+            />
+          </label>
+        ))}
+      </div>
+      <div className="mt-4"><Button onClick={save} loading={saving}>Save</Button></div>
+    </Card>
   );
 }
 

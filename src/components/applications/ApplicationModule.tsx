@@ -6,6 +6,7 @@ import { Plus, Search, Pencil } from 'lucide-react';
 import type { ModuleApi } from '../../services/applications.service';
 import type { ServiceApplication, ApplicationStatus, FieldError, UserRole } from '../../types';
 import { normaliseError } from '../../lib/api';
+import { documentsApi, type DocumentMeta, formatBytes } from '../../services/documents.service';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
@@ -52,6 +53,7 @@ const LIMIT = 10;
 export function ApplicationModule({ title, description, api, schema, fields, columns, createRoles, createLabel }: Props) {
   const hasRole = useAuthStore((s) => s.hasRole);
   const canCreate = hasRole(...createRoles);
+  const canEditStatus = hasRole('admin', 'operator', 'loan_executive'); // not customers
 
   const [data, setData] = useState<{ items: ServiceApplication[]; total: number } | null>(null);
   const [search, setSearch] = useState('');
@@ -182,7 +184,7 @@ export function ApplicationModule({ title, description, api, schema, fields, col
                       <StatusBadge status={row.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {canCreate && (
+                      {canEditStatus && (
                         <button
                           onClick={() => setStatusTarget(row)}
                           className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
@@ -260,6 +262,8 @@ function CreateModal({
   onCreated: () => void;
 }) {
   const [formError, setFormError] = useState<string | null>(null);
+  const [docs, setDocs] = useState<DocumentMeta[]>([]);
+  const [selectedDocs, setSelectedDocs] = useState<Record<string, boolean>>({});
   const {
     register,
     handleSubmit,
@@ -273,14 +277,17 @@ function CreateModal({
     if (open) {
       reset();
       setFormError(null);
+      setSelectedDocs({});
+      documentsApi.list().then((r) => setDocs(r.items)).catch(() => setDocs([]));
     }
   }, [open, reset]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onSubmit = async (values: Record<string, any>) => {
     setFormError(null);
+    const documents = Object.keys(selectedDocs).filter((id) => selectedDocs[id]);
     try {
-      await api.create(values);
+      await api.create({ ...values, documents });
       onCreated();
     } catch (e) {
       const err = normaliseError(e);
@@ -330,7 +337,29 @@ function CreateModal({
             );
           })}
         </div>
-        <div className="mt-2 flex justify-end gap-2">
+        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="mb-2 text-sm font-bold text-slate-700">Attach documents (optional)</p>
+          {docs.length === 0 ? (
+            <p className="text-xs text-slate-500">You have no saved documents yet. Upload Aadhaar, PAN, RC etc. in the Document Scanner — they'll appear here to attach.</p>
+          ) : (
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {docs.map((d) => (
+                <label key={d.id} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={!!selectedDocs[d.id]}
+                    onChange={(e) => setSelectedDocs((p) => ({ ...p, [d.id]: e.target.checked }))}
+                    className="h-3.5 w-3.5 rounded border-slate-300"
+                  />
+                  <span className="truncate font-medium text-slate-700">{d.category ? `${d.category} · ` : ''}{d.fileName}</span>
+                  <span className="ml-auto text-slate-400">{formatBytes(d.sizeBytes)}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>

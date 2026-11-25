@@ -7,6 +7,7 @@ import type { UserRole } from '../../types';
 export interface NavItem {
   label: string;
   labelKey: string;
+  serviceType?: string;
   to: string;
   icon: LucideIcon;
   roles?: UserRole[]; // undefined = visible to all authenticated users
@@ -18,10 +19,10 @@ export const navItems: NavItem[] = [
   { label: 'FID Card Maker', labelKey: 'nav.fid', to: '/fid', icon: IdCard, roles: ['admin', 'operator'], ready: true },
   { label: 'Farmers', labelKey: 'nav.farmers', to: '/farmers', icon: Users, roles: ['admin', 'operator', 'viewer', 'loan_executive'], ready: true },
   { label: 'FRUITS / K-Kisan Lookup', labelKey: 'nav.lookup', to: '/lookup', icon: Search, roles: ['admin'], ready: true },
-  { label: 'Crop Insurance', labelKey: 'nav.crop', to: '/crop-insurance', icon: Sprout, roles: ['admin', 'operator'], ready: true },
-  { label: 'Vehicle Insurance', labelKey: 'nav.vehicle', to: '/vehicle-insurance', icon: Car, roles: ['admin', 'operator'], ready: true },
-  { label: 'Trailer Certificate', labelKey: 'nav.trailer', to: '/trailer-certificate', icon: Truck, roles: ['admin', 'operator'], ready: true },
-  { label: 'Loan Leads', labelKey: 'nav.loan', to: '/loan-leads', icon: Landmark, roles: ['admin', 'loan_executive'], ready: true },
+  { label: 'Crop Insurance', labelKey: 'nav.crop', to: '/crop-insurance', icon: Sprout, roles: ['admin', 'operator', 'customer'], serviceType: 'crop', ready: true },
+  { label: 'Vehicle Insurance', labelKey: 'nav.vehicle', to: '/vehicle-insurance', icon: Car, roles: ['admin', 'operator', 'customer'], serviceType: 'vehicle', ready: true },
+  { label: 'Usha Tailoring Certificate', labelKey: 'nav.trailer', to: '/trailer-certificate', icon: Truck, roles: ['admin', 'operator', 'customer'], serviceType: 'trailer', ready: true },
+  { label: 'Loan Leads', labelKey: 'nav.loan', to: '/loan-leads', icon: Landmark, roles: ['admin', 'loan_executive', 'customer'], serviceType: 'loan', ready: true },
   { label: 'Document Scanner', labelKey: 'nav.documents', to: '/documents', icon: ScanLine, roles: ['admin', 'operator', 'viewer', 'loan_executive'], ready: true },
   { label: 'Wallet', labelKey: 'nav.wallet', to: '/wallet', icon: Wallet, ready: true },
   { label: 'Payments', labelKey: 'nav.payments', to: '/payments', icon: QrCode, ready: true },

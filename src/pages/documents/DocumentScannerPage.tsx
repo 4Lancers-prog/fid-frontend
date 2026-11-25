@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useT } from '../../i18n';
-import { Camera, Upload, FileText, Trash2, X, Eye } from 'lucide-react';
+import { Camera, Upload, FileText, Trash2, X, Eye, ScanLine, CheckCircle2, QrCode, RefreshCw } from 'lucide-react';
+import QRCode from 'qrcode';
+import { createUploadSession } from '../../services/upload.service';
 import {
   documentsApi,
   fileToDataUrl,
@@ -13,6 +15,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
+import { Select } from '../../components/common/Select';
 import { FormField } from '../../components/common/FormField';
 import { Alert } from '../../components/common/Alert';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -23,10 +26,18 @@ interface Selected {
   dataUrl: string;
 }
 
+const REQUIRED_DOCS: { key: string; label: string }[] = [
+  { key: 'Aadhaar', label: 'Aadhaar card' },
+  { key: 'PAN', label: 'PAN card' },
+  { key: 'RC', label: 'RC (vehicle)' },
+  { key: 'Photo', label: 'Passport photo' },
+  { key: 'Land record', label: 'Land record' },
+];
+
 export function DocumentScannerPage() {
   const t = useT();
   const hasRole = useAuthStore((s) => s.hasRole);
-  const canUpload = hasRole('admin', 'operator');
+  const canUpload = hasRole('admin', 'operator', 'customer');
 
   const [selected, setSelected] = useState<Selected | null>(null);
   const [category, setCategory] = useState('');
@@ -36,6 +47,8 @@ export function DocumentScannerPage() {
 
   const [docs, setDocs] = useState<DocumentMeta[] | null>(null);
   const [preview, setPreview] = useState<{ meta: DocumentMeta; data: string } | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -50,7 +63,25 @@ export function DocumentScannerPage() {
 
   useEffect(() => {
     loadDocs();
+    // Poll so documents uploaded from the phone appear here automatically.
+    const id = setInterval(loadDocs, 5000);
+    return () => clearInterval(id);
   }, [loadDocs]);
+
+  const makeQr = useCallback(async () => {
+    setQrError(null);
+    try {
+      const { token } = await createUploadSession();
+      const url = `${window.location.origin}/upload?token=${encodeURIComponent(token)}`;
+      setQrDataUrl(await QRCode.toDataURL(url, { width: 220, margin: 1 }));
+    } catch (e) {
+      setQrError(normaliseError(e).message);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (canUpload) makeQr();
+  }, [canUpload, makeQr]);
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -106,6 +137,36 @@ export function DocumentScannerPage() {
     }
   };
 
+  // Guided scan: each required document is uploaded pre-tagged with the right type.
+  const guidedRef = useRef<HTMLInputElement>(null);
+  const [scanType, setScanType] = useState<string | null>(null);
+  const startScan = (type: string) => {
+    setError(null);
+    setScanType(type);
+    setTimeout(() => guidedRef.current?.click(), 0);
+  };
+  const onGuidedFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !scanType) return;
+    const validationError = validateDocFile(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      await documentsApi.create({ fileName: file.name, data: dataUrl, category: scanType });
+      setToast(`${scanType} uploaded and filed correctly.`);
+      setTimeout(() => setToast(null), 4000);
+      loadDocs();
+    } catch (err) {
+      setError(normaliseError(err).message);
+    } finally {
+      setScanType(null);
+    }
+  };
+
   const isImage = selected?.file.type.startsWith('image/');
 
   return (
@@ -117,6 +178,79 @@ export function DocumentScannerPage() {
 
       {toast && <div className="mb-4"><Alert tone="success">{toast}</Alert></div>}
       {error && <div className="mb-4"><Alert tone="error">{error}</Alert></div>}
+
+      {canUpload && (
+        <Card className="mb-6">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+            <div className="flex h-[232px] w-[232px] flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white p-2">
+              {qrError ? (
+                <span className="px-3 text-center text-xs text-red-500">{qrError}</span>
+              ) : qrDataUrl ? (
+                <img src={qrDataUrl} alt="Scan to upload" className="h-full w-full" />
+              ) : (
+                <QrCode className="h-16 w-16 text-slate-300" />
+              )}
+            </div>
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><QrCode className="h-5 w-5" /> Upload from your phone</h2>
+              <p className="mt-1 text-sm text-slate-500">Scan this QR code with your phone camera. It opens a page where you can photograph your documents (Aadhaar, PAN, RC, photo). They're mapped to your account automatically and appear below.</p>
+              <button onClick={makeQr} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                <RefreshCw className="h-3.5 w-3.5" /> New QR code
+              </button>
+              <p className="mt-2 text-xs text-slate-400">The link expires after 30 minutes for security.</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {canUpload && (
+        <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Or scan / upload directly on this device</div>
+      )}
+
+      {canUpload && (
+        <Card className="mb-6">
+          <input ref={guidedRef} type="file" accept="image/*,application/pdf" capture="environment" className="hidden" onChange={onGuidedFile} />
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-700">
+            <ScanLine className="h-4 w-4" /> Scan your documents
+          </h2>
+          <p className="mb-4 text-xs text-slate-500">Tap a document, scan it with your phone camera, and it's filed under the correct type automatically — ready to attach to any application.</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {REQUIRED_DOCS.map((r) => {
+              const existing = (docs ?? []).find((d) => d.category === r.key);
+              return (
+                <div key={r.key} className={`rounded-xl border p-3 ${existing ? 'border-brand-300 bg-brand-50/50' : 'border-slate-200'}`}>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-800">{r.label}</span>
+                    {existing ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700"><CheckCircle2 className="h-3.5 w-3.5" /> Uploaded</span>
+                    ) : (
+                      <span className="text-xs text-slate-400">Not uploaded</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => startScan(r.key)}
+                      disabled={scanType === r.key}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                    >
+                      <Camera className="h-3.5 w-3.5" /> {existing ? 'Rescan / Replace' : 'Scan / Upload'}
+                    </button>
+                    {existing && (
+                      <button onClick={() => view(existing)} className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-2.5 py-2 text-slate-500 hover:bg-slate-50" aria-label="View">
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {canUpload && (
+        <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Or upload any other document</div>
+      )}
 
       {canUpload && (
         <Card className="mb-6">
@@ -153,8 +287,16 @@ export function DocumentScannerPage() {
                 </div>
               </div>
 
-              <FormField label="Category / Label (optional)" htmlFor="cat">
-                <Input id="cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Aadhaar, Land record, Photo" />
+              <FormField label="Document type" htmlFor="cat">
+                <Select id="cat" value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="">Select type…</option>
+                  <option value="Aadhaar">Aadhaar card</option>
+                  <option value="PAN">PAN card</option>
+                  <option value="RC">RC (vehicle)</option>
+                  <option value="Photo">Photo</option>
+                  <option value="Land record">Land record</option>
+                  <option value="Other">Other</option>
+                </Select>
               </FormField>
 
               <div className="flex justify-end gap-2">

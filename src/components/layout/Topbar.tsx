@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { api } from '../../lib/api';
 import { useT } from '../../i18n';
 import { LanguageSwitcher } from '../common/LanguageSwitcher';
+import { NotificationBell } from './NotificationBell';
 
 const roleLabels: Record<string, string> = {
   super_admin: 'Super Admin',
@@ -39,6 +40,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
 
       <div className="flex flex-1 items-center justify-end gap-3">
         <LanguageSwitcher />
+        <NotificationBell />
         <div className="flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700">
           <WalletIcon className="h-4 w-4" />
           {balance === null ? '—' : `₹${balance.toFixed(2)}`}

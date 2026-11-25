@@ -35,7 +35,7 @@ export function LoanPage() {
       schema={loanSchema}
       fields={fields}
       columns={columns}
-      createRoles={['admin', 'loan_executive']}
+      createRoles={['admin', 'loan_executive', 'customer']}
       createLabel="New Lead"
     />
   );

@@ -5,6 +5,7 @@ import { HomePage } from '../pages/public/HomePage';
 import { RegisterPage } from '../pages/public/RegisterPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { AdminLoginPage } from '../pages/auth/AdminLoginPage';
+import { MobileUploadPage } from '../pages/upload/MobileUploadPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { FidCardMakerPage } from '../pages/fid/FidCardMakerPage';
 import { FarmersPage } from '../pages/farmers/FarmersPage';
@@ -28,6 +29,7 @@ export function AppRouter() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route path="/upload" element={<MobileUploadPage />} />
 
       {/* Authenticated app */}
       <Route
@@ -42,10 +44,10 @@ export function AppRouter() {
         <Route path="/farmers" element={<FarmersPage />} />
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/lookup" element={<ProtectedRoute roles={['admin']}><LookupPage /></ProtectedRoute>} />
-        <Route path="/crop-insurance" element={<ProtectedRoute roles={['admin', 'operator', 'viewer']}><CropPage /></ProtectedRoute>} />
-        <Route path="/vehicle-insurance" element={<ProtectedRoute roles={['admin', 'operator', 'viewer']}><VehiclePage /></ProtectedRoute>} />
-        <Route path="/trailer-certificate" element={<ProtectedRoute roles={['admin', 'operator', 'viewer']}><TrailerPage /></ProtectedRoute>} />
-        <Route path="/loan-leads" element={<ProtectedRoute roles={['admin', 'loan_executive', 'viewer']}><LoanPage /></ProtectedRoute>} />
+        <Route path="/crop-insurance" element={<ProtectedRoute roles={['admin', 'operator', 'viewer', 'customer']}><CropPage /></ProtectedRoute>} />
+        <Route path="/vehicle-insurance" element={<ProtectedRoute roles={['admin', 'operator', 'viewer', 'customer']}><VehiclePage /></ProtectedRoute>} />
+        <Route path="/trailer-certificate" element={<ProtectedRoute roles={['admin', 'operator', 'viewer', 'customer']}><TrailerPage /></ProtectedRoute>} />
+        <Route path="/loan-leads" element={<ProtectedRoute roles={['admin', 'loan_executive', 'viewer', 'customer']}><LoanPage /></ProtectedRoute>} />
         <Route path="/documents" element={<ProtectedRoute roles={['admin', 'operator', 'viewer', 'loan_executive', 'customer']}><DocumentScannerPage /></ProtectedRoute>} />
         <Route path="/payments" element={<PaymentsPage />} />
         <Route path="/applications" element={<ProtectedRoute roles={['admin']}><ApplicationsPage /></ProtectedRoute>} />

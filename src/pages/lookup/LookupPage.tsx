@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
-import { Search, UserCheck, ArrowRight, ShieldCheck, Download } from 'lucide-react';
-import { lookupByAadhaar, createFarmer, type FetchedDetails } from '../../services/farmer.service';
+import { ExternalLink, Search, ShieldCheck, UserCheck, ArrowRight } from 'lucide-react';
+import { lookupByAadhaar, createFarmer } from '../../services/farmer.service';
 import { farmerSchema, type FarmerForm } from '../../schemas';
 import type { Farmer, FieldError } from '../../types';
 import { normaliseError } from '../../lib/api';
@@ -16,71 +16,49 @@ import { TextArea } from '../../components/common/TextArea';
 import { FormField } from '../../components/common/FormField';
 import { Alert } from '../../components/common/Alert';
 
+const OFFICIAL_PORTAL = 'https://kkisan.karnataka.gov.in/Citizen/FarmServiceFIDDetails.aspx?AID=FM';
+
 type DetailsForm = Omit<FarmerForm, 'aadhaarNumber'>;
-type Phase = 'search' | 'found' | 'entry';
 
 export function LookupPage() {
   const t = useT();
   const navigate = useNavigate();
   const [aadhaar, setAadhaar] = useState('');
   const [aadhaarError, setAadhaarError] = useState<string | null>(null);
-  const [fetching, setFetching] = useState(false);
-  const [phase, setPhase] = useState<Phase>('search');
+  const [checking, setChecking] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
   const [existing, setExisting] = useState<Farmer | null>(null);
-  const [source, setSource] = useState<'database' | 'fruits' | 'manual' | null>(null);
   const [saved, setSaved] = useState<Farmer | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    reset,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<DetailsForm>({ resolver: zodResolver(farmerSchema.omit({ aadhaarNumber: true }) as never) });
 
   const normalisedAadhaar = aadhaar.replace(/\D/g, '');
 
-  const prefill = (d: FetchedDetails) =>
-    reset({
-      name: d.name ?? '',
-      gender: d.gender ?? undefined,
-      fid: d.fid ?? '',
-      mobile: d.mobile ?? '',
-      address: d.address ?? '',
-      village: d.village ?? '',
-      taluk: d.taluk ?? '',
-      district: d.district ?? '',
-    } as DetailsForm);
-
-  const fetchDetails = async () => {
+  const check = async () => {
     setAadhaarError(null);
     setExisting(null);
-    setSource(null);
     if (normalisedAadhaar.length !== 12) {
       setAadhaarError('Enter a valid 12-digit Aadhaar number.');
       return;
     }
-    setFetching(true);
+    setChecking(true);
     try {
       const res = await lookupByAadhaar(normalisedAadhaar);
       if (res.exists && res.farmer) {
         setExisting(res.farmer);
-        setSource('database');
-        setPhase('found');
-      } else if (res.details) {
-        prefill(res.details);
-        setSource('fruits');
-        setPhase('entry');
       } else {
-        reset({} as DetailsForm);
-        setSource('manual');
-        setPhase('entry');
+        setStep(2);
       }
     } catch (e) {
       setAadhaarError(normaliseError(e).message);
     } finally {
-      setFetching(false);
+      setChecking(false);
     }
   };
 
@@ -96,15 +74,6 @@ export function LookupPage() {
     }
   };
 
-  const resetAll = () => {
-    setAadhaar('');
-    setPhase('search');
-    setExisting(null);
-    setSaved(null);
-    setSource(null);
-    setAadhaarError(null);
-  };
-
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex items-center gap-2">
@@ -114,9 +83,18 @@ export function LookupPage() {
         </span>
       </div>
 
+      <div className="mb-5">
+        <Alert tone="info">
+          This is an <strong>assisted</strong> workflow. Complete any OTP, CAPTCHA and verification directly on the
+          official government portal — this app never bypasses them or scrapes protected data. You then transcribe the
+          verified details here.
+        </Alert>
+      </div>
+
+      {/* Step 1: Aadhaar + handoff */}
       <Card className="mb-5">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700">
-          <Search className="h-4 w-4" /> Enter Aadhaar to fetch farmer details
+          <Search className="h-4 w-4" /> Step 1 — Enter Aadhaar &amp; verify on the official portal
         </h2>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
@@ -129,49 +107,44 @@ export function LookupPage() {
                 onChange={(e) => setAadhaar(e.target.value)}
                 hasError={!!aadhaarError}
                 placeholder="XXXX XXXX XXXX"
-                disabled={phase !== 'search'}
+                disabled={step === 2}
               />
             </FormField>
           </div>
-          {phase === 'search' ? (
-            <Button type="button" onClick={fetchDetails} loading={fetching} className="mb-4">
-              <Download className="h-4 w-4" /> Fetch details
+          <a href={OFFICIAL_PORTAL} target="_blank" rel="noreferrer" className="mb-4">
+            <Button type="button" variant="secondary">
+              <ExternalLink className="h-4 w-4" /> Open official portal
             </Button>
-          ) : (
-            <Button type="button" variant="ghost" onClick={resetAll} className="mb-4">
-              New search
+          </a>
+          {step === 1 && (
+            <Button type="button" onClick={check} loading={checking} className="mb-4">
+              Check &amp; Continue <ArrowRight className="h-4 w-4" />
             </Button>
           )}
         </div>
+
+        {existing && (
+          <div className="mt-2">
+            <Alert tone="warning">
+              A farmer profile already exists for this Aadhaar: <strong>{existing.name}</strong> ({existing.fid}). You can
+              reuse it instead of creating a duplicate.
+            </Alert>
+            <div className="mt-3 flex gap-2">
+              <Button variant="ghost" onClick={() => navigate('/farmers')}>
+                <UserCheck className="h-4 w-4" /> Open in Farmers
+              </Button>
+              <Button onClick={() => navigate('/fid')}>Use for FID card</Button>
+            </div>
+          </div>
+        )}
       </Card>
 
-      {phase === 'found' && existing && (
+      {/* Step 2: transcribe verified details */}
+      {step === 2 && !saved && (
         <Card>
-          <Alert tone="success">
-            Found an existing farmer profile for this Aadhaar: <strong>{existing.name}</strong> ({existing.fid}).
-          </Alert>
-          <div className="mt-3 flex gap-2">
-            <Button variant="ghost" onClick={() => navigate('/farmers')}>
-              <UserCheck className="h-4 w-4" /> Open in Farmers
-            </Button>
-            <Button onClick={() => navigate('/fid')}>
-              Use for FID card <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {phase === 'entry' && !saved && (
-        <Card>
-          <div className="mb-3">
-            {source === 'fruits' ? (
-              <Alert tone="success">Details fetched from the FRUITS/K-Kisan service. Review and save.</Alert>
-            ) : (
-              <Alert tone="info">
-                No record found for this Aadhaar. Enter the farmer's details below to create the profile.
-              </Alert>
-            )}
-          </div>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700">
+            <ShieldCheck className="h-4 w-4" /> Step 2 — Enter the verified details
+          </h2>
           {formError && <div className="mb-4"><Alert tone="error">{formError}</Alert></div>}
           <form onSubmit={handleSubmit(onSave)} noValidate>
             <div className="grid gap-x-4 sm:grid-cols-2">
@@ -200,10 +173,12 @@ export function LookupPage() {
 
       {saved && (
         <Card>
-          <Alert tone="success">Saved farmer profile for <strong>{saved.name}</strong> ({saved.fid}).</Alert>
+          <Alert tone="success">
+            Saved verified profile for <strong>{saved.name}</strong> ({saved.fid}).
+          </Alert>
           <div className="mt-3 flex gap-2">
-            <Button variant="ghost" onClick={resetAll}>New search</Button>
-            <Button onClick={() => navigate('/fid')}>Use for FID card <ArrowRight className="h-4 w-4" /></Button>
+            <Button variant="ghost" onClick={() => navigate('/farmers')}>Open in Farmers</Button>
+            <Button onClick={() => navigate('/fid')}>Use for FID card</Button>
           </div>
         </Card>
       )}

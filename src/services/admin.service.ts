@@ -50,3 +50,9 @@ export const applicationsApi = {
   updateStatus: async (serviceType: string, id: string, status: string, remarks?: string) =>
     (await api.patch(`/applications/${serviceType}/${id}/status`, { status, remarks })).data.data,
 };
+
+export const serviceSettingsApi = {
+  get: async (): Promise<{ enabledServices: Record<string, boolean> }> => (await api.get('/service-settings')).data.data,
+  update: async (enabledServices: Record<string, boolean>): Promise<{ enabledServices: Record<string, boolean> }> =>
+    (await api.put('/service-settings', { enabledServices })).data.data,
+};

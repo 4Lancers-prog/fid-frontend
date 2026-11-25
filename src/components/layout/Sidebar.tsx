@@ -1,14 +1,24 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Sprout, X } from 'lucide-react';
 import { navItems } from './navItems';
 import { useAuthStore } from '../../store/authStore';
+import { serviceSettingsApi } from '../../services/admin.service';
 import { Badge } from '../common/Badge';
 import { useT } from '../../i18n';
 import type { TKey } from '../../i18n/dictionary';
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const hasRole = useAuthStore((s) => s.hasRole);
+  const user = useAuthStore((s) => s.user);
   const t = useT();
+  const [enabled, setEnabled] = useState<Record<string, boolean> | null>(null);
+
+  useEffect(() => {
+    serviceSettingsApi.get().then((r) => setEnabled(r.enabledServices)).catch(() => setEnabled(null));
+  }, []);
+
+  const isCustomer = user?.role === 'customer';
 
   return (
     <>
@@ -38,6 +48,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {navItems
             .filter((item) => !item.roles || hasRole(...item.roles))
+            .filter((item) => !(isCustomer && item.serviceType && enabled && enabled[item.serviceType] === false))
             .map((item) => (
               <NavLink
                 key={item.to}

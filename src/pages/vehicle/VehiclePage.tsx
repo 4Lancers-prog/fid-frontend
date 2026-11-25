@@ -37,7 +37,7 @@ export function VehiclePage() {
       schema={vehicleSchema}
       fields={fields}
       columns={columns}
-      createRoles={['admin', 'operator']}
+      createRoles={['admin', 'operator', 'customer']}
       createLabel="New Lead"
     />
   );

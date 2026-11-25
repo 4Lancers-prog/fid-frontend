@@ -38,7 +38,7 @@ export function CropPage() {
       schema={cropSchema}
       fields={fields}
       columns={columns}
-      createRoles={['admin', 'operator']}
+      createRoles={['admin', 'operator', 'customer']}
       createLabel="New Application"
     />
   );
