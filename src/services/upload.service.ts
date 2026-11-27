@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { api } from '../lib/api';
-import type { DocumentMeta } from './documents.service';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 // Plain client (no auth/refresh interceptors) for the public, token-based mobile page.
@@ -11,10 +10,18 @@ export async function createUploadSession(): Promise<{ token: string; expiresInM
   return (await api.post('/upload-session')).data.data;
 }
 
+export interface TempDoc {
+  id: string;
+  fileName: string;
+  category?: string;
+  data: string;
+  createdAt: string;
+}
+
 export interface UploadSessionInfo {
   valid: boolean;
   userName: string;
-  documents: DocumentMeta[];
+  documents: TempDoc[];
 }
 
 export async function getUploadSession(token: string): Promise<UploadSessionInfo> {
@@ -24,6 +31,10 @@ export async function getUploadSession(token: string): Promise<UploadSessionInfo
 export async function uploadViaToken(
   token: string,
   input: { fileName: string; data: string; category?: string },
-): Promise<DocumentMeta> {
+): Promise<{ id: string; fileName: string; category?: string }> {
   return (await plain.post(`/upload-session/${encodeURIComponent(token)}/documents`, input)).data.data;
+}
+
+export async function clearSession(token: string): Promise<{ removed: number }> {
+  return (await plain.delete(`/upload-session/${encodeURIComponent(token)}/documents`)).data.data;
 }
