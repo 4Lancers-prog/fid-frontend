@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useT } from '../../i18n';
-import { Camera, Upload, FileText, Trash2, X, Eye, ScanLine, CheckCircle2, QrCode, RefreshCw } from 'lucide-react';
+import { Camera, Upload, FileText, Trash2, X, Eye, ScanLine, CheckCircle2, QrCode, RefreshCw, Printer } from 'lucide-react';
 import QRCode from 'qrcode';
-import { createUploadSession } from '../../services/upload.service';
+import { createUploadSession, getUploadSession, clearSession, type TempDoc } from '../../services/upload.service';
 import {
   documentsApi,
   fileToDataUrl,
@@ -49,6 +49,8 @@ export function DocumentScannerPage() {
   const [preview, setPreview] = useState<{ meta: DocumentMeta; data: string } | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [tempDocs, setTempDocs] = useState<TempDoc[]>([]);
 
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -72,6 +74,8 @@ export function DocumentScannerPage() {
     setQrError(null);
     try {
       const { token } = await createUploadSession();
+      setSessionToken(token);
+      setTempDocs([]);
       const url = `${window.location.origin}/upload?token=${encodeURIComponent(token)}`;
       setQrDataUrl(await QRCode.toDataURL(url, { width: 220, margin: 1 }));
     } catch (e) {
@@ -82,6 +86,54 @@ export function DocumentScannerPage() {
   useEffect(() => {
     if (canUpload) makeQr();
   }, [canUpload, makeQr]);
+
+  useEffect(() => {
+    if (!sessionToken) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const info = await getUploadSession(sessionToken);
+        if (active) setTempDocs(info.documents);
+      } catch {
+        /* session may have expired */
+      }
+    };
+    poll();
+    const id = setInterval(poll, 4000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [sessionToken]);
+
+  const printTemp = () => {
+    if (tempDocs.length === 0) return;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const body = tempDocs
+      .map((d) =>
+        d.data.startsWith('data:application/pdf')
+          ? `<iframe src="${d.data}" style="width:100%;height:100vh;border:0;page-break-after:always"></iframe>`
+          : `<img src="${d.data}" style="display:block;width:100%;page-break-after:always;object-fit:contain" />`,
+      )
+      .join('');
+    w.document.write(`<html><head><title>Print documents</title></head><body style="margin:0">${body}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 600);
+  };
+
+  const clearTemp = async () => {
+    if (!sessionToken) return;
+    try {
+      await clearSession(sessionToken);
+      setTempDocs([]);
+      setToast('Uploaded documents cleared.');
+      setTimeout(() => setToast(null), 3000);
+    } catch (e) {
+      setError(normaliseError(e).message);
+    }
+  };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -191,13 +243,41 @@ export function DocumentScannerPage() {
                 <QrCode className="h-16 w-16 text-slate-300" />
               )}
             </div>
-            <div>
-              <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><QrCode className="h-5 w-5" /> Upload from your phone</h2>
-              <p className="mt-1 text-sm text-slate-500">Scan this QR code with your phone camera. It opens a page where you can photograph your documents (Aadhaar, PAN, RC, photo). They're mapped to your account automatically and appear below.</p>
+            <div className="min-w-0 flex-1">
+              <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><QrCode className="h-5 w-5" /> Upload documents to print</h2>
+              <p className="mt-1 text-sm text-slate-500">Scan this QR with a phone camera, photograph the documents, and they appear here to print. These are <strong>temporary</strong> — not saved — and can be cleared after printing.</p>
               <button onClick={makeQr} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
                 <RefreshCw className="h-3.5 w-3.5" /> New QR code
               </button>
-              <p className="mt-2 text-xs text-slate-400">The link expires after 30 minutes for security.</p>
+              <p className="mt-2 text-xs text-slate-400">The link expires after 2 hours.</p>
+
+              {tempDocs.length > 0 && (
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{tempDocs.length} uploaded</span>
+                    <div className="flex gap-2">
+                      <button onClick={printTemp} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600">
+                        <Printer className="h-3.5 w-3.5" /> Print all
+                      </button>
+                      <button onClick={clearTemp} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">
+                        <Trash2 className="h-3.5 w-3.5" /> Clear
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {tempDocs.map((d) => (
+                      <div key={d.id} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                        {d.data.startsWith('data:application/pdf') ? (
+                          <div className="flex h-20 items-center justify-center text-slate-400"><FileText className="h-7 w-7" /></div>
+                        ) : (
+                          <img src={d.data} alt={d.fileName} className="h-20 w-full object-cover" />
+                        )}
+                        {d.category && <div className="truncate bg-white px-1.5 py-1 text-center text-[10px] font-medium text-slate-600">{d.category}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Card>
