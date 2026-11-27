@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ScanLine, Camera, CheckCircle2, Sprout } from 'lucide-react';
-import { getUploadSession, uploadViaToken, type UploadSessionInfo } from '../../services/upload.service';
-import { validateDocFile, fileToDataUrl, type DocumentMeta } from '../../services/documents.service';
+import { getUploadSession, uploadViaToken, type UploadSessionInfo, type TempDoc } from '../../services/upload.service';
+import { validateDocFile, fileToDataUrl } from '../../services/documents.service';
 import { normaliseError } from '../../lib/api';
 import { Alert } from '../../components/common/Alert';
 import { FullPageLoader } from '../../components/common/Spinner';
@@ -21,7 +21,7 @@ export function MobileUploadPage() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const [session, setSession] = useState<UploadSessionInfo | null>(null);
-  const [docs, setDocs] = useState<DocumentMeta[]>([]);
+  const [docs, setDocs] = useState<TempDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -102,7 +102,7 @@ export function MobileUploadPage() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-700"><ScanLine className="h-4 w-4" /> Required documents</h2>
-          <p className="mb-4 text-xs text-slate-500">Tap a document, take a clear photo, and it's filed under the correct type automatically.</p>
+          <p className="mb-4 text-xs text-slate-500">Tap a document and take a clear photo. It's sent to the counter to be printed — nothing is stored permanently.</p>
 
           {toast && <div className="mb-3"><Alert tone="success">{toast}</Alert></div>}
           {error && <div className="mb-3"><Alert tone="error">{error}</Alert></div>}
