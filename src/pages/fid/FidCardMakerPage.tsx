@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
+import fidTemplate from '../../assets/fid-template.png';
 import { useT } from '../../i18n';
-import { Search, Printer, RefreshCw, Upload, UserCheck, Sprout } from 'lucide-react';
+import { Search, Printer, RefreshCw, Upload, UserCheck } from 'lucide-react';
 import { listFarmers } from '../../services/farmer.service';
 import { generateFid, getFidFee } from '../../services/fid.service';
 import type { Farmer } from '../../types';
@@ -17,28 +19,38 @@ const genderLabel: Record<string, string> = {
   female: 'ಮಹಿಳೆ / Female',
   other: 'ಇತರೆ / Other',
 };
+const genderKannada: Record<string, string> = { male: 'ಪುರುಷ', female: 'ಮಹಿಳೆ', other: 'ಇತರೆ' };
 
 interface CardState {
   name: string;
   gender: string;
   aadhaarMasked: string;
   fid: string;
+  mobile: string;
+  village: string;
+  taluk: string;
+  district: string;
   address: string;
   photo?: string;
 }
 
 const defaultCard: CardState = {
-  name: 'ಬಸವರಾಜ ಪಾಟೀಲ',
-  gender: 'ಪುರುಷ / Male',
-  aadhaarMasked: 'XXXX-XXXX-XXXX',
-  fid: 'FID9876543210',
-  address: 'ಸುಳ್ಳ, ಹುಬ್ಬಳ್ಳಿ ತಾಲ್ಲೂಕು, ಧಾರವಾಡ',
+  name: 'ರಮೇಶ್ ಕುಮಾರ್ ಪಾಟೀಲ',
+  gender: 'ಪುರುಷ',
+  aadhaarMasked: 'XXXX XXXX 1234',
+  fid: 'FID202611000856',
+  mobile: '9880065988',
+  village: 'ಸುಳ್ಳ',
+  taluk: 'ಧಾರವಾಡ',
+  district: 'ಧಾರವಾಡ – 580023',
+  address: '',
 };
 
 export function FidCardMakerPage() {
   const t = useT();
   const [card, setCard] = useState<CardState>(defaultCard);
   const [selectedFarmer, setSelectedFarmer] = useState<Farmer | null>(null);
+  const [qr, setQr] = useState<string | undefined>();
   const [fee, setFee] = useState<number | null>(null);
   const [notice, setNotice] = useState<{ tone: 'success' | 'error' | 'info'; msg: string } | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -50,14 +62,28 @@ export function FidCardMakerPage() {
       .catch(() => setFee(5));
   }, []);
 
+  useEffect(() => {
+    if (!card.fid) {
+      setQr(undefined);
+      return;
+    }
+    QRCode.toDataURL(card.fid, { margin: 0, width: 160 })
+      .then(setQr)
+      .catch(() => setQr(undefined));
+  }, [card.fid]);
+
   const applyFarmer = (f: Farmer) => {
     setSelectedFarmer(f);
     setCard({
       name: f.name,
-      gender: genderLabel[f.gender] ?? f.gender,
+      gender: genderKannada[f.gender] ?? f.gender,
       aadhaarMasked: f.aadhaarMasked,
       fid: f.fid,
-      address: f.address || [f.village, f.taluk, f.district].filter(Boolean).join(', '),
+      mobile: f.mobile || '',
+      village: f.village || '',
+      taluk: f.taluk || '',
+      district: f.district || '',
+      address: f.address || '',
       photo: f.photo,
     });
     setNotice({ tone: 'info', msg: `Loaded profile for ${f.name}. Review the card and generate when ready.` });
@@ -167,7 +193,7 @@ export function FidCardMakerPage() {
         {/* Right: live preview */}
         <div className="flex flex-col items-center rounded-2xl border border-dashed border-brand-300 bg-gradient-to-br from-brand-50 to-gold-100 p-5">
           <div id="fid-print-container">
-            <FidCard card={card} />
+            <FidCard card={card} qr={qr} />
           </div>
           <p className="mt-3 text-center text-xs text-slate-500">Live preview · 85.6 × 54 mm</p>
         </div>
@@ -245,59 +271,123 @@ function FarmerPicker({ onSelect }: { onSelect: (f: Farmer) => void }) {
 }
 
 /** The printable FID card. Dimensions and print behaviour mirror the prototype. */
-function FidCard({ card }: { card: CardState }) {
+/*
+ * FID card = the uploaded template image as the background, with the live fields
+ * overlaid on top. Nudge the numbers in POS (percentages of the card) to line the
+ * fields up over the artwork. Positions scale automatically (cqw = % of card width),
+ * so the preview and the 4x6 print stay aligned.
+ */
+const POS = {
+  photo: { left: 4.6, top: 29.2, width: 17.8, height: 37.6 },
+  qr: { left: 6.0, top: 71.5, width: 11.4, height: 17.2 },
+  valueLeft: 42.6, // where the values (after the colon) start
+  rows: {
+    name: 30.6,
+    gender: 38.8,
+    aadhaar: 47.0,
+    fid: 55.0,
+    mobile: 62.8,
+    address: 70.2,
+  },
+};
+// Masking chip behind each value hides the sample text baked into the template.
+// If you later use a BLANK template (no sample data), set MASK = false.
+const MASK = true;
+const MASK_BG = 'rgba(243, 248, 235, 0.92)';
+
+function Val({
+  top,
+  value,
+  size = 3.3,
+  color = '#143806',
+  bold = false,
+}: {
+  top: number;
+  value: React.ReactNode;
+  size?: number;
+  color?: string;
+  bold?: boolean;
+}) {
   return (
-    <div className="fid-card-print relative flex h-[54mm] w-[85.6mm] flex-col overflow-hidden rounded-md border border-brand-700 bg-white shadow-lg">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b-2 border-gold-600 bg-gradient-to-r from-brand-800 via-brand-500 to-gold-500 px-2 py-1 text-white">
-        <div className="flex-1 text-center leading-tight">
-          <h4 className="text-[9.5px] font-bold tracking-tight">ರೈತ ಗುರುತಿನ ಚೀಟಿ · FID CARD</h4>
-          <span className="block text-[7.5px] font-bold text-gold-100">FARMER INFORMATION PROFILE · ಮಾದರಿ ವಿನ್ಯಾಸ</span>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="flex flex-1 gap-1.5 bg-gradient-to-br from-brand-50/60 to-gold-100/40 px-1.5 py-1">
-        <div className="flex h-[24mm] w-[19mm] flex-shrink-0 items-center justify-center overflow-hidden rounded border-[1.5px] border-brand-500 bg-slate-100">
-          {card.photo ? (
-            <img src={card.photo} alt="farmer" className="h-full w-full object-cover" />
-          ) : (
-            <svg viewBox="0 0 24 24" className="h-8 w-8 fill-slate-400">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-            </svg>
-          )}
-        </div>
-
-        <div className="flex-1 text-[7.8px] leading-tight text-slate-900">
-          <Row label="ಹೆಸರು / Name:" value={card.name} />
-          <Row label="ಲಿಂಗ / Gender:" value={card.gender} />
-          <Row label="ಆಧಾರ್ / Aadhaar:" value={card.aadhaarMasked} />
-          <Row
-            label="FID ಸಂಖ್ಯೆ:"
-            value={
-              <span className="rounded bg-gold-100 px-1 font-extrabold text-amber-800">{card.fid}</span>
-            }
-          />
-          <Row label="ವಿಳಾಸ / Address:" value={card.address} />
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-slate-300 bg-gradient-to-r from-brand-50 to-gold-100 px-1.5 py-0.5">
-        <div className="text-[6px] font-bold text-red-900">⚠️ ಮಾದರಿ ಕಾರ್ಡ್ — ಅಧಿಕೃತ ಸರ್ಕಾರಿ ಗುರುತಿನ ಚೀಟಿ ಅಲ್ಲ</div>
-        <div className="flex h-[8.5mm] w-[8.5mm] items-center justify-center rounded border border-brand-300 bg-gradient-to-br from-brand-100 to-gold-100 text-brand-700">
-          <Sprout className="h-3 w-3" />
-        </div>
-      </div>
+    <div
+      className="absolute whitespace-nowrap"
+      style={{
+        left: `${POS.valueLeft}%`,
+        top: `${top}%`,
+        fontSize: `${size}cqw`,
+        color,
+        fontWeight: bold ? 800 : 600,
+        lineHeight: 1.1,
+        background: MASK ? MASK_BG : undefined,
+        borderRadius: MASK ? '0.4cqw' : undefined,
+        padding: MASK ? '0.2cqw 0.8cqw' : undefined,
+      }}
+    >
+      {value}
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+function FidCard({ card, qr }: { card: CardState; qr?: string }) {
   return (
-    <div className="mb-0.5 flex">
-      <span className="w-[25mm] flex-shrink-0 font-bold text-brand-800">{label}</span>
-      <span className="break-words font-semibold text-slate-800">{value}</span>
+    <div
+      className="fid-card-print relative overflow-hidden rounded-xl shadow-lg"
+      style={{ width: '86mm', aspectRatio: '1340 / 893', containerType: 'inline-size' }}
+    >
+      <img src={fidTemplate} alt="" className="absolute inset-0 h-full w-full" style={{ objectFit: 'fill' }} />
+
+      {/* Photo (covers the sample photo) */}
+      <div
+        className="absolute overflow-hidden rounded"
+        style={{ left: `${POS.photo.left}%`, top: `${POS.photo.top}%`, width: `${POS.photo.width}%`, height: `${POS.photo.height}%` }}
+      >
+        {card.photo ? (
+          <img src={card.photo} alt="farmer" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-slate-200">
+            <svg viewBox="0 0 24 24" className="h-1/2 w-1/2 fill-slate-400"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
+          </div>
+        )}
+      </div>
+
+      {/* QR (covers the sample QR) */}
+      <div
+        className="absolute bg-white"
+        style={{ left: `${POS.qr.left}%`, top: `${POS.qr.top}%`, width: `${POS.qr.width}%`, height: `${POS.qr.height}%` }}
+      >
+        {qr && <img src={qr} alt="QR" className="h-full w-full" />}
+      </div>
+
+      {/* Values */}
+      <Val top={POS.rows.name} value={card.name} size={3.4} bold />
+      <Val top={POS.rows.gender} value={card.gender} size={3.4} />
+      <Val top={POS.rows.aadhaar} value={card.aadhaarMasked} size={3.2} />
+      <Val top={POS.rows.fid} value={card.fid} size={3.2} color="#166a0f" bold />
+      <Val top={POS.rows.mobile} value={card.mobile} size={3.2} />
+      <div
+        className="absolute"
+        style={{
+          left: `${POS.valueLeft}%`,
+          top: `${POS.rows.address}%`,
+          fontSize: '2.7cqw',
+          lineHeight: 1.4,
+          color: '#143806',
+          fontWeight: 600,
+          background: MASK ? MASK_BG : undefined,
+          borderRadius: MASK ? '0.4cqw' : undefined,
+          padding: MASK ? '0.2cqw 0.8cqw' : undefined,
+        }}
+      >
+        {card.village || card.taluk || card.district ? (
+          <>
+            {card.village && <div>ಹಳ್ಳಿ : {card.village}</div>}
+            {card.taluk && <div>ತಾಲ್ಲೂಕು : {card.taluk}</div>}
+            {card.district && <div>ಜಿಲ್ಲೆ : {card.district}</div>}
+          </>
+        ) : (
+          card.address
+        )}
+      </div>
     </div>
   );
 }
